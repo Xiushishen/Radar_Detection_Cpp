@@ -70,7 +70,12 @@ class RadarToCamConverter : public rclcpp::Node
         double dist_2_right_;
         double dist_2_left_;
         std::vector<double> detected_vel_;
+
 };
+
+
+
+#endif // RADAR_DETECTION_CPP__RADAR_PCL_2_CAM_HPP
 
 
 
