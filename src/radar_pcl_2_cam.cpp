@@ -1,11 +1,12 @@
-#include "radar_detection_cpp/radar_pcl_2_cam.hpp"
-
+#include "radar_pcl_to_cam.hpp"
+#include "radar_detection.hpp"
+ 
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 #include <tf2_ros/transform_listener.h>
 #include "message_filters/subscriber.h"
 #include "message_filters/time_synchronizer.h"
 #include "builtin_interfaces/msg/duration.hpp"
-
+#include <tuple>
 using std::placeholders::_1;
 using std::placeholders::_2;
 
@@ -42,7 +43,7 @@ public:
         // ----------------------------------- RADAR ---------------------------------- //
 
         this->radar_sub = this->create_subscription<delphi_esr_msgs::msg::EsrTrack>(
-                    "/radar_front_est_input", qos_profile,
+                    "/radar_front_esr_input", qos_profile,
                     std::bind(&RadarToCamConverter::radar_callback, this, _1));
         static_cast<void>(radar_sub);
 
@@ -75,24 +76,24 @@ public:
         std::bind(&RadarToCamConverter::timer_callback, this));
     }
 private:
-    bool isinside_polygon(const geometry_msgs::msg::Point32::SharedPtr point, const geometry_msgs::msg::Polygon::SharedPtr vertices)
+    bool isinside_polygon(std::vector<double> point, geometry_msgs::msg::Polygon vertices)
     const {
       std::complex<double> sum_(0, 0);
-      for (int i = 1; i < vertices->points.size(); i++)
+      for (int i = 1; i < vertices.points.size(); i++)
       {
-        const auto& v0 = std::complex<double>(vertices->points[i - 1].x, vertices->points[i - 1].y);
-        const auto& v1 = std::complex<double>(vertices->points[i % vertices->points.size()].x, vertices->points[i % vertices->points.size()].y);
-        sum_ += std::log((v1 - std::complex<double>(point->x, point->y)) / (v0 - std::complex<double>(point->x, point->y)));
+        const auto& v0 = std::complex<double>(vertices.points[i - 1].x, vertices.points[i - 1].y);
+        const auto& v1 = std::complex<double>(vertices.points[i % vertices.points.size()].x, vertices.points[i % vertices.points.size()].y);
+        sum_ += std::log((v1 - std::complex<double>(point[0], point[1])) / (v0 - std::complex<double>(point[0], point[1])));
       }
       return std::abs(sum_) > 1;
     }
 
     bool is_on_track(
-      const geometry_msgs::msg::Point32::SharedPtr point,
-      const geometry_msgs::msg::Polygon::SharedPtr inside_polygon,
-      const geometry_msgs::msg::Polygon::SharedPtr outside_polygon
+      std::vector<double> point,
+      geometry_msgs::msg::Polygon inside_polygon,
+      geometry_msgs::msg::Polygon outside_polygon
       ) const {
-        if (point == nullptr)
+        if (point.empty()) 
         {
           return false;
         }
@@ -111,32 +112,85 @@ private:
         ego_vel_[1] = msg->ver_speed;
     }
 
-    void radar_callback(const delphi_esr_msgs::msg::EsrTrack::SharedPtr msg){
-        return;
+    void radar_callback(const delphi_esr_msgs::msg::EsrTrack::SharedPtr msg)
+    {
+      RadarDetection detection(msg);
+      if (detection.get_vaild_preproc() && !ego_vel_.empty())
+      {
+        // -------------------------- Get Cartesian Position -------------------------- //
+        std::vector<double> cartesian_pos = detection.get_cartesian_pos();
+        // ------------------------------ Get Kinematics ------------------------------ //
+        double det_speed_wrt_ego = detection.get_speed();
+
+        // -------------------------- Check if static object -------------------------- //
+        bool is_static = detection.get_static(std::abs(ego_vel_[0]));
+        if (detection.get_valid_postproc())
+        {
+        // ---------------------- Prepare and publish marker msg ---------------------- //
+        // RCLCPP_INF(this->get_logger(), "checking polygon");
+          std::vector<double> cartesian_pos_new {cartesian_pos[0], cartesian_pos[1]};
+          if (!is_on_track(cartesian_pos_new, inside_polygon, outside_polygon))
+          {
+            return;
+          }
+          autoware_auto_perception_msgs::msg::DetectedObjects detectedobjs_msg;
+          autoware_auto_perception_msgs::msg::DetectedObject object_msg;
+          detectedobjs_msg.header.frame_id = "radar_front";
+          detectedobjs_msg.header.stamp = msg->header.stamp;
+
+          object_msg.existence_probability = 0.0;
+          autoware_auto_perception_msgs::msg::ObjectClassification object_classification;
+          object_classification.label = 1;
+          object_classification.probability = 1.0;
+          object_msg.classification.push_back(object_classification);
+          object_msg.kinematics.pose_with_covariance.pose.position.x = cartesian_pos[0];
+          object_msg.kinematics.pose_with_covariance.pose.position.y = cartesian_pos[1];
+          object_msg.kinematics.pose_with_covariance.pose.position.z = 0.0;
+          object_msg.kinematics.pose_with_covariance.pose.orientation.w = 1.0;
+
+          detected_vel_ = detection.get_cartesian_vel();
+
+          object_msg.kinematics.twist_with_covariance.twist.linear.x = ego_vel_[0] + detected_vel_[0];
+          object_msg.kinematics.twist_with_covariance.twist.linear.y = ego_vel_[1] + detected_vel_[0];
+          object_msg.kinematics.twist_with_covariance.twist.linear.z = 0.0;
+
+          object_msg.shape.dimensions.x = 2.9;
+          object_msg.shape.dimensions.y = 1.6;
+          object_msg.shape.dimensions.z = 1.0;
+          RCLCPP_INFO(this->get_logger(), "Detection: %s", detection.toString().c_str());
+          detectedobjs_msg.objects.push_back(object_msg);
+          latest_detection = detectedobjs_msg;
+        }
+      } 
     }
     
     void timer_callback()
     {
-        if (latest_detection == nullptr)
+        RCLCPP_INFO(this->get_logger(), "timer callback"); 
+        if (latest_detection.objects.size() != 0)
         {
             deted_objs_pub->publish(latest_detection);
-            RCLCPP_INFO(this->get_logger(), "%f", latest_detection->objects[0]->kinematics.pose_with_covariance.pose.position);
-            latest_detection = nullptr;
+            RCLCPP_INFO(this->get_logger(), "%f", latest_detection.objects[0].kinematics.pose_with_covariance.pose.position);
+            latest_detection.objects.clear();
         }
         else
         {
-            
+            autoware_auto_perception_msgs::msg::DetectedObjects detectedobjs_msg;
+            detectedobjs_msg.header.frame_id = "radar_front";
+            detectedobjs_msg.header.stamp = this->now();
+            RCLCPP_INFO(this->get_logger(), "no detection");
+            deted_objs_pub->publish(detectedobjs_msg);
         }
     }
 
-    void inside_polygon_calback(const geometry_msgs::msg::PolygonStamped::SharedPtr msg)
+    void inside_polygon_calback(geometry_msgs::msg::PolygonStamped msg)
     {
-        inside_polygon = msg->polygon;
+        inside_polygon = msg.polygon;
     }
 
-    void outside_polygon_calback(const geometry_msgs::msg::PolygonStamped::SharedPtr msg)
+    void outside_polygon_calback(geometry_msgs::msg::PolygonStamped msg)
     {
-        outside_polygon = msg->polygon;
+        outside_polygon = msg.polygon;
     }
     void get_detection(const visualization_msgs::msg::Marker::SharedPtr msg){
         double y = msg->pose.position.y;
@@ -144,7 +198,7 @@ private:
         bool publish = false;
         if ((x <= 200) && (!ego_vel_.size()) && (ego_vel_[0] > 5) && inside_polygon.points.size() != 0 && outside_polygon.points.size() != 0)  // MAX_DET_RANGE and STATIC_VEL_THRESHOLD 
         {
-          if (is_on_track(a,b,c))
+          if (is_on_track({x, y}, inside_polygon, outside_polygon))
           {
             publish = true;
           }
@@ -161,7 +215,6 @@ private:
               object_classification.label = 1;
               object_classification.probability = 1.0;
               object_msg.classification.push_back(object_classification);
-              object_msg.kinematics.pose_with_covariance.pose.position.x = x;
               object_msg.kinematics.pose_with_covariance.pose.position.x = x;
               object_msg.kinematics.pose_with_covariance.pose.position.y = y;
               object_msg.kinematics.pose_with_covariance.pose.position.z = 0.0;
@@ -200,8 +253,8 @@ private:
     double dist_2_right_;
     double dist_2_left_;
     std::vector<double> detected_vel_;
-
-
+    geometry_msgs::msg::Point32 point_;
+    std::vector<double> point_ {point_.x, point_.y};
 };
 
 int main(int argc, char **argv)

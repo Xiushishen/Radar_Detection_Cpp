@@ -1,8 +1,23 @@
 cmake_minimum_required(VERSION 3.8)
 project(radar_detection_cpp)
 
+# Default to C++17.
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Set ROS_DISTRO macros
+set(ROS_DISTRO $ENV{ROS_DISTRO})
+if(${ROS_DISTRO} STREQUAL "rolling")
+  add_compile_definitions(ROS_DISTRO_ROLLING)
+elseif(${ROS_DISTRO} STREQUAL "galactic")
+  add_compile_definitions(ROS_DISTRO_GALACTIC)
+elseif(${ROS_DISTRO} STREQUAL "humble")
+  add_compile_definitions(ROS_DISTRO_HUMBLE)
 endif()
 
 # find dependencies
@@ -22,25 +37,19 @@ find_package(novatel_oem7_msgs REQUIRED)
 find_package(delphi_esr_msgs REQUIRED)
 find_package(autoware_auto_perception_msgs REQUIRED)
 
-add_executable(radar_to_cam_node src/radar_pcl_2_cam.cpp)
+add_executable(radar_to_cam_node src/radar_pcl_to_cam.cpp)
 ament_target_dependencies(radar_to_cam_node rclcpp std_msgs vision_msgs
 visualization_msgs Eigen3 tf2_ros image_transport Boost delphi_esr_msgs novatel_oem7_msgs autoware_auto_perception_msgs)
 
 
-install(TARGETS
-  radar_to_cam_node
-  DESTINATION lib/${PROJECT_NAME}
-  )
-
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
+  # uncomment the line when a copyright and license is not present in all source files
+  #set(ament_cmake_copyright_FOUND TRUE)
   # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
+  # uncomment the line when this package is not in a git repo
+  #set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 

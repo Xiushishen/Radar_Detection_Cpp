@@ -1,5 +1,5 @@
-#ifndef RADAR_DETECTION_CPP__RADAR_PCL_2_CAM_HPP
-#define RADAR_DETECTION_CPP__RADAR_PCL_2_CAM_HPP
+#ifndef RADAR_PCL_TO_CAM_HPP_
+#define RADAR_PCL_TO_CAM_HPP_
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_srvs/srv/empty.hpp"
@@ -43,8 +43,8 @@ class RadarToCamConverter : public rclcpp::Node
         bool isinside_polygon(const geometry_msgs::msg::Point32::SharedPtr point, const geometry_msgs::msg::Polygon::SharedPtr vertices) const;    
 
         bool is_on_track(const geometry_msgs::msg::Point32::SharedPtr point,
-                         const geometry_msgs::msg::Polygon::SharedPtr inside_polygon,
-                         const geometry_msgs::msg::Polygon::SharedPtr outside_polygon) const;
+        const geometry_msgs::msg::Polygon::SharedPtr inside_polygon,
+        const geometry_msgs::msg::Polygon::SharedPtr outside_polygon) const;
         void gps_vel_callback(const novatel_oem7_msgs::msg::BESTVEL::SharedPtr msg);
         void radar_callback(const delphi_esr_msgs::msg::EsrTrack::SharedPtr msg);
         void timer_callback();
@@ -73,10 +73,4 @@ class RadarToCamConverter : public rclcpp::Node
 
 };
 
-
-
-#endif // RADAR_DETECTION_CPP__RADAR_PCL_2_CAM_HPP
-
-
-
-#endif // RADAR_DETECTION_CPP__RADAR_PCL_2_CAM_HPP
+#endif  // RADAR_PCL_TO_CAM_HPP_
