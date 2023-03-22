@@ -1,5 +1,5 @@
-#include "radar_pcl_to_cam.hpp"
-#include "radar_detection.hpp"
+#include "radar_detection_cpp/radar_pcl_to_cam.hpp"
+#include "radar_detection_cpp/radar_detection.hpp"
  
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 #include <tf2_ros/transform_listener.h>
@@ -10,10 +10,7 @@
 using std::placeholders::_1;
 using std::placeholders::_2;
 
-class RadarToCamConverter : public rclcpp::Node
-{
-public:
-    RadarToCamConverter() : Node("radar_to_cam_node")
+RadarToCamConverter::RadarToCamConverter() : Node("radar_to_cam_node")
     {
         // ---------------------- Initialize Required Attributes ---------------------- //      
         this->declare_parameter("ego_vel", 0.0);
@@ -75,9 +72,8 @@ public:
         timer = this->create_wall_timer(std::chrono::milliseconds(200),
         std::bind(&RadarToCamConverter::timer_callback, this));
     }
-private:
-    bool isinside_polygon(std::vector<double> point, geometry_msgs::msg::Polygon vertices)
-    const {
+    bool RadarToCamConverter::isinside_polygon(std::vector<double> point, geometry_msgs::msg::Polygon vertices)
+    {
       std::complex<double> sum_(0, 0);
       for (int i = 1; i < vertices.points.size(); i++)
       {
@@ -88,7 +84,7 @@ private:
       return std::abs(sum_) > 1;
     }
 
-    bool is_on_track(
+    bool RadarToCamConverter::is_on_track(
       std::vector<double> point,
       geometry_msgs::msg::Polygon inside_polygon,
       geometry_msgs::msg::Polygon outside_polygon
@@ -107,12 +103,12 @@ private:
         }
         return false;
       } 
-    void gps_vel_callback(const novatel_oem7_msgs::msg::BESTVEL::SharedPtr msg){
+    void RadarToCamConverter::gps_vel_callback(const novatel_oem7_msgs::msg::BESTVEL::SharedPtr msg){
         ego_vel_[0] = msg->hor_speed;
         ego_vel_[1] = msg->ver_speed;
     }
 
-    void radar_callback(const delphi_esr_msgs::msg::EsrTrack::SharedPtr msg)
+    void RadarToCamConverter::radar_callback(const delphi_esr_msgs::msg::EsrTrack::SharedPtr msg)
     {
       RadarDetection detection(msg);
       if (detection.get_vaild_preproc() && !ego_vel_.empty())
@@ -164,7 +160,7 @@ private:
       } 
     }
     
-    void timer_callback()
+    void RadarToCamConverter::timer_callback()
     {
         RCLCPP_INFO(this->get_logger(), "timer callback"); 
         if (latest_detection.objects.size() != 0)
@@ -183,16 +179,16 @@ private:
         }
     }
 
-    void inside_polygon_calback(geometry_msgs::msg::PolygonStamped msg)
+    void RadarToCamConverter::inside_polygon_calback(geometry_msgs::msg::PolygonStamped msg)
     {
         inside_polygon = msg.polygon;
     }
 
-    void outside_polygon_calback(geometry_msgs::msg::PolygonStamped msg)
+    void RadarToCamConverter::outside_polygon_calback(geometry_msgs::msg::PolygonStamped msg)
     {
         outside_polygon = msg.polygon;
     }
-    void get_detection(const visualization_msgs::msg::Marker::SharedPtr msg){
+    void RadarToCamConverter::get_detection(const visualization_msgs::msg::Marker::SharedPtr msg){
         double y = msg->pose.position.y;
         double x = msg->pose.position.x;
         bool publish = false;
@@ -235,27 +231,6 @@ private:
           }
         }
     }
-    rclcpp::Subscription<delphi_esr_msgs::msg::EsrTrack>::SharedPtr radar_sub;
-    rclcpp::Subscription<novatel_oem7_msgs::msg::BESTVEL>::SharedPtr gps_vel_sub;
-    rclcpp::Subscription<visualization_msgs::msg::Marker>::SharedPtr front_radar_moving;
-    rclcpp::Subscription<visualization_msgs::msg::Marker>::SharedPtr front_radar_moving_objs;
-    rclcpp::Subscription<geometry_msgs::msg::PolygonStamped>::SharedPtr inside_polygon_sub;
-    rclcpp::Subscription<geometry_msgs::msg::PolygonStamped>::SharedPtr outside_polygon_sub;
-    rclcpp::Publisher<autoware_auto_perception_msgs::msg::DetectedObjects>::SharedPtr deted_objs_pub;
-    
-    rclcpp::TimerBase::SharedPtr timer;
-    autoware_auto_perception_msgs::msg::DetectedObjects latest_detection;
-    geometry_msgs::msg::Polygon inside_polygon;
-    geometry_msgs::msg::Polygon outside_polygon;
-    geometry_msgs::msg::Vector3 get_detection_velocity;
-    std::vector<double> ego_vel_;
-    double pre_pos_;
-    double dist_2_right_;
-    double dist_2_left_;
-    std::vector<double> detected_vel_;
-    geometry_msgs::msg::Point32 point_;
-    std::vector<double> point_ {point_.x, point_.y};
-};
 
 int main(int argc, char **argv)
 {

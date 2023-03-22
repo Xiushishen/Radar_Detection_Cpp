@@ -1,5 +1,5 @@
-#ifndef RADAR_DETECTION_CPP__RADAR_DETECTION_HPP
-#define RADAR_DETECTION_CPP__RADAR_DETECTION_HPP
+#ifndef RADAR_DETECTION_HPP_
+#define RADAR_DETECTION_HPP_
 
 #include <iostream>
 #include <cmath>
@@ -12,7 +12,7 @@ class RadarDetection
     public:
         RadarDetection::RadarDetection(const delphi_esr_msgs::msg::EsrTrack::SharedPtr msg);
 
-        RadarDetection::~RadarDetection();
+        RadarDetection::~RadarDetection()=default;
 
         bool get_vaild_preproc();
 
@@ -51,4 +51,4 @@ class RadarDetection
         double rel_speed;
         bool is_static;
 };
-#endif // RADAR_DETECTION_CPP__RADAR_DETECTION_HPP
+#endif // RADAR_DETECTION_HPP_

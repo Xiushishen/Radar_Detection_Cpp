@@ -1,5 +1,5 @@
-#ifndef RADAR_PCL_TO_CAM_HPP_
-#define RADAR_PCL_TO_CAM_HPP_
+// #ifndef RADAR_PCL_TO_CAM_HPP_
+// #define RADAR_PCL_TO_CAM_HPP_
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_srvs/srv/empty.hpp"
@@ -40,7 +40,7 @@ class RadarToCamConverter : public rclcpp::Node
         RadarToCamConverter();
 
     private:
-        bool isinside_polygon(const geometry_msgs::msg::Point32::SharedPtr point, const geometry_msgs::msg::Polygon::SharedPtr vertices) const;    
+        bool isinside_polygon(const geometry_msgs::msg::Point32::SharedPtr point, const geometry_msgs::msg::Polygon::SharedPtr vertices);    
 
         bool is_on_track(const geometry_msgs::msg::Point32::SharedPtr point,
         const geometry_msgs::msg::Polygon::SharedPtr inside_polygon,
@@ -73,4 +73,4 @@ class RadarToCamConverter : public rclcpp::Node
 
 };
 
-#endif  // RADAR_PCL_TO_CAM_HPP_
+// #endif  // RADAR_PCL_TO_CAM_HPP_

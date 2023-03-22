@@ -20,27 +20,28 @@ elseif(${ROS_DISTRO} STREQUAL "humble")
   add_compile_definitions(ROS_DISTRO_HUMBLE)
 endif()
 
-# find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(visualization_msgs REQUIRED)
-find_package(vision_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(eigen3_cmake_module REQUIRED)
+# Export the library using ament_auto_cmake
+find_package(ament_cmake_auto REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(image_transport REQUIRED)
-find_package(Boost REQUIRED)
-find_package(novatel_oem7_msgs REQUIRED)
-find_package(delphi_esr_msgs REQUIRED)
-find_package(autoware_auto_perception_msgs REQUIRED)
+include_directories(SYSTEM ${EIGEN3_INCLUDE_DIRS})
+ament_auto_find_build_dependencies(REQUIRED 
+  ${${PROJECT_NAME}_BUILD_DEPENDS}
+  ${${PROJECT_NAME}_BUILDTOOL_DEPENDS}
+) 
 
-add_executable(radar_to_cam_node src/radar_pcl_to_cam.cpp)
-ament_target_dependencies(radar_to_cam_node rclcpp std_msgs vision_msgs
-visualization_msgs Eigen3 tf2_ros image_transport Boost delphi_esr_msgs novatel_oem7_msgs autoware_auto_perception_msgs)
+# TODO remove if doesn't work
+SET(${PROJECT_NAME}_SRC
+  src/radar_pcl_to_cam.cpp
+  src/radar_detection.cpp
+)
+# ament_auto_add_library(${PROJECT_NAME} SHARED 
+#   ${${PROJECT_NAME}_LIB_SRC}
+#   ${${PROJECT_NAME}_LIB_HEADER}
+# )
 
+ament_auto_add_executable(radar_to_cam_node
+  ${${PROJECT_NAME}_SRC}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -53,10 +54,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-include_directories(${rclcpp_INCLUDE_DIRS}
-                    ${vision_msgs_INCLUDE_DIRS})
-
-install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
-install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
-
-ament_package()
+ament_auto_package(INSTALL_TO_SHARE
+  launch
+  config
+)
